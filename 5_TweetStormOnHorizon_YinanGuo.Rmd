@@ -1,0 +1,295 @@
+---
+title: "Tweet Storm on the Horizon"
+output:
+  html_document:
+    df_print: paged
+---
+# Overview 
+
+President Trump, love him or hate him or just don’t care, is the most famous & powerful Twitter user of all time. Like it or not, President Trump’s tweets have become a source of information. The New York Times, Wall Street Journal and others news outlets and take a look at President Trump’s Tweets why shouldn’t we? This week let’s put politics aside and let the data do the talking! You can either use my dataset "TrumpQ12020Tweets.csv" or grab the latest tweets from the http://www.trumptwitterarchive.com/. Just be sure to grab enough to do some analysis - i.e. 3 months or more.
+
+## Load Libraries
+
+library(tidyverse)
+library(lubridate)
+library(tidytext)
+library(topicmodels)
+library(wordcloud2)
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(tidytext)
+library(topicmodels)
+library(wordcloud2)
+
+```
+
+### load tweets 
+
+Note the data is pipe delimited( delim = "|") so you'll need to read them with read_delim instead of read_csv, if you read ahead you'll also see that you might need to transform created_at as a date variable (col_types = cols(created_at = col_datetime(format = "%m-%d-%Y %H:%M:%S"))) 
+
+"TrumpQ12020Tweets.csv"
+
+```{r}
+trump<- read_delim("data/TrumpQ12020Tweets.csv",delim = "|",col_types = cols(created_at = col_datetime(format = "%m-%d-%Y %H:%M:%S")))
+trump
+```
+
+## Term Frequency & Wordcloud 
+
+create tweet_freq table
+
+1. create a month_varaible 
+2. parse terms into words, remove the following 
+  - stop words
+  - c("t.co", "https", "false", "twitter", "iphone", "amp", "rt", "android")
+3. summarize by month and word
+4. take top 100 words by month 
+
+create the following three word clouds: 
+1. word cloud of all terms 
+1. word cloud for month 1 
+2. word cloud for month 2 
+3. word cloud for month 3 
+
+answer: what terms jump out at you? 
+1.realdonaldtrump, democrats
+2.realdonaldtrump, president, democrats
+3.realdonaldtrump, president
+4.realdonaldtrump, coronaviras
+
+```{r}
+excludes <- c("t.co", "https", "false", "twitter", "iphone", "amp", "rt", "android")
+
+trump <- trump %>%
+  mutate(month = months(created_at)) 
+
+trump %>%
+  unnest_tokens(word, text) %>%
+  anti_join(get_stopwords(language="en"),by=c('word' = 'word')) %>%
+  filter(!word %in% excludes) %>%
+  filter(!is.na(month)) %>%
+  group_by(month, word) %>%
+  count(word,sort=TRUE) %>%
+  ungroup() %>%
+  group_by(month) %>%
+  slice_max(n,n=100) %>%
+  ungroup() ->tweet_freq
+
+tweet_freq %>%
+  group_by(word) %>%
+  summarise(n = sum(n)) %>%
+  arrange(desc(n)) %>%
+  wordcloud2(size = 0.5)
+
+tweet_freq %>%
+  filter(month == 'January') %>%
+  select(word,n) %>%
+  wordcloud2(size = 0.5)
+
+tweet_freq %>%
+  filter(month == 'February') %>%
+  select(word,n) %>%
+  wordcloud2(size = 0.5)
+
+tweet_freq %>%
+  filter(month == 'March') %>%
+  select(word,n) %>%
+  wordcloud2(size = 0.5)
+```
+
+## Bigram Analysis 
+
+create table bigram_freq by 
+1. create a bigram 
+2. summarize by bigram 
+3. use separate to split bigram into word1 and word2 then filter the following
+  - stop words against both word1 and word2 
+  - c("t.co", "https", "false", "twitter", "iphone", "amp", "rt", "android")
+  - filter digits 
+4. create a bigram varaible by combining word1 and word2 together 
+
+create the following 
+
+1. wordcloud of top 100 bigram terms. 
+2. make a chart of the top 10 terms that come after the word "fake", be sure to use coordinate flip 
+3. make a chart of the top 10 terms that come before the word "media", be sure to use coordinate flip 
+4. make a chart of the top 3 terms that before  "joe", be sure to use coordinate flip 
+
+answer: what jumps out at you? 
+1.fake news;
+2.fake news;
+3.news media;
+4.sleepy joe
+```{r}
+trump %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2, n_min = 2) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% excludes) %>%
+  filter(!word2 %in% excludes) %>%
+  anti_join(get_stopwords(language="en"),by = c('word1'='word')) %>%
+  anti_join(get_stopwords(language="en"),by = c('word2'='word')) %>%
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!str_detect(word1,"^\\d")) %>% 
+  filter(!str_detect(word2,"^\\d")) %>% 
+  mutate(bigram = str_c( word1, word2, sep = " ")) %>%
+  group_by(bigram) %>%
+  count(bigram,sort=TRUE) %>%
+  ungroup() ->bigram_freq
+
+bigram_freq %>%
+  slice_max(n,n=100) %>%
+  wordcloud2(size = 0.5)
+
+bigram_freq %>%
+  filter(str_detect(bigram, "^fake") == TRUE) %>%
+  top_n(10) %>%
+  ggplot(aes(reorder(bigram, n),n)) +
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title="top 10 'fake'+ bigrams ",
+        x =" 'fake'+ bigrams ", 
+        y = "times") 
+
+bigram_freq %>%
+  filter(str_ends(bigram, "media") == TRUE) %>%
+  top_n(10) %>%
+  ggplot(aes(reorder(bigram, n),n)) +
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title="top 10 'media'+ bigrams ",
+        x =" +'media' bigrams ", 
+        y = "times")
+
+bigram_freq %>%
+  filter(str_ends(bigram, "joe") == TRUE) %>%
+  top_n(3) %>%
+  ggplot(aes(reorder(bigram, n),n)) +
+  geom_bar(stat='identity') +
+  coord_flip() +
+  labs(title="top 3 +'joe' bigrams ",
+        x =" +'joe' bigrams ", 
+        y = "times")
+
+
+```
+
+
+## Sentiments
+
+create sentiment_by_month 
+1. inner join words_by_month to "bing" sentiments 
+2. group by month and sentiment 
+3. get the top 10 words by month 
+4. make words with negative sentiment negative (-n) and positive words positive
+
+create the following bar charts 
+
+1. chart 1 sentiment for month 1, besure to order n, and coord_flip 
+2. chart 1 sentiment for month 2, besure to order n, and coord_flip 
+3. chart 1 sentiment for month 3, besure to order n, and coord_flip 
+
+Answer: what if anything does this tell you? 
+great, trump, thank
+```{r}
+library(rtweet)
+
+sentiment_by_month <- tweet_freq %>%
+  inner_join(get_sentiments("bing"), by=c("word"="word")) %>%
+  group_by(month, sentiment) %>%
+  top_n(10,n)%>%
+  arrange(desc(n)) %>%
+  mutate(n = if_else(sentiment == "negative", -n, n))
+  
+sentiment_by_month %>%
+  filter(month=='January') %>%
+  ggplot(aes(reorder(word, n), n, fill=sentiment)) +
+  geom_col() + 
+  coord_flip() +
+  labs(title = "Bing: January terms by sentiment", x = "term", y="count")
+
+sentiment_by_month %>%
+  filter(month=='February') %>%
+  ggplot(aes(reorder(word, n), n, fill=sentiment)) +
+  geom_col() + 
+  coord_flip() +
+  labs(title = "Bing: February terms by sentiment", x = "term", y="count")
+
+sentiment_by_month %>%
+  filter(month=='March') %>%
+  ggplot(aes(reorder(word, n), n, fill=sentiment)) +
+  geom_col() + 
+  coord_flip() +
+  labs(title = "Bing: March terms by sentiment", x = "term", y="count")
+```
+
+## Topic Prep 
+
+Create tweet_dtm by preparing a Document Term Matrix (dtm) 
+
+1. unest tokens into words 
+2. remove the following 
+  - stop words
+  - c("t.co", "https", "false", "twitter", "iphone", "amp", "rt", "android")
+3. summarize by id_str (tweet id) and word
+4. take top 20 words by id 
+
+create tweet_lda by taking your tweet_dtm, pick a value of k (4,6,8 or 10)
+
+
+```{r}
+trump %>%
+  unnest_tokens(word, text) %>%
+  anti_join(get_stopwords(language="en")) %>%
+  filter(!word %in% excludes) %>%
+  filter(!is.na(id_str)) %>%
+  group_by(id_str, word) %>%
+  count(word,sort=TRUE) %>%
+  ungroup() %>%
+  group_by(id_str) %>%
+  slice_max(n,n=20) ->trump_freq
+
+tweet_dtm <- trump_freq %>% cast_dtm(id_str, word, n)
+
+tweet_lda <- LDA(tweet_dtm, k = 8, method = "Gibbs", control = list(seed = 1234))
+```
+
+
+## Topic Model 
+
+1. document term matrix needs to be cleaned up and generate beta 
+2. generate topic terms by extracting top_n by beta 
+3. plot your topics 
+
+Answer what topics did you idenitfy? 
+
+```{r}
+tidy_tweet <- tidy(tweet_lda,matrix = "beta")
+
+tweet_topic_terms <- tidy_tweet %>%
+  group_by(topic) %>%
+  top_n(5, beta) %>%
+  arrange(topic)
+
+tweet_topic_terms %>%
+  mutate(term = reorder(term, beta)) %>%
+  ungroup() %>%
+  arrange(desc(beta)) %>%  
+  ggplot(aes(reorder(term, beta), beta, fill = as.factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Topic Terms",
+       x = NULL, y = expression(beta)) + 
+  facet_wrap(~ topic, ncol = 5, scales = "free") +
+  theme(axis.text.x = element_text(angle=45,hjust=0.5,size=6))
+
+```
+
+
+## Finally, 
+
+Based on your analysis of President Trump's tweets, what stood out to you? what did you think about this type of analysis. Write up your thoughts on this analysis. 
+
+Answer:
+Trump is a narcissism and a democrat. He always tag #realdonaldtrump to show his identity. He loves talking about politics related problems and wants people to trust him.
