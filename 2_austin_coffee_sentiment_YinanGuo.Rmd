@@ -1,0 +1,287 @@
+---
+title   : "Assignment 2 - Austin TX Coffee Sentiment"
+author  : "Yinan Guo"
+date    : "2021-07-18" 
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: paper
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Instructions
+
+The Ratings_and_Sentiments.csv dataset contains over 7,600 reviews of 66 coffee shops in Austin Texas, the data was initially scraped, munged and prepped by Rachel Downs (http://www.racheldowns.co) a Marketing and MIS student at UT Austin. 
+
+Your challenge is to further prepare the data (easy), and create summaries and charts answering various questions about the data (also easy) 
+
+To complete this assignment, follow these steps:
+
+1. Download the `2_cup_o_joe_yournamehere.RMD` file from the course website.
+
+2. Open `2_cup_o_joe_yournamehere.RMD` in RStudio.
+
+3. Replace the "Your Name Here" text in the `author:` field with your own name.
+
+4. Supply your solutions to the project by editing `2_cup_o_joe_yournamehere.RMD`.
+
+5. When you have completed the homework and have **checked** that your code both runs in the Console and **knit** correctly when you click `Knit HTML`, rename the R Markdown file to `Austin_Coffee_Sentiment_YourNameHere.Rmd`, and submit it.  
+
+> Tip:  Note that each of the code blocks in this Problem contain the expression `eval = FALSE`.  This tells R Markdown to display the code contained in the block, but not to evaluate it.  you'll need to change this to `eval = TRUE` before you **knit!!!**
+
+### Step 0. Load Libraries 
+
+> load the following libraries, you may need to install them first! 
+- tidyverse 
+- lubridate # -- a new library that makes dealing with dates easy 
+- stringr   # -- a new library that makes dealing wiht strings easy 
+- ggplot2
+- janitor 
+- skimr 
+
+don't forget to change `eval=FASE` to `eval=TRUE`
+
+```{r}
+library(tidyverse)
+library(skimr)
+library(janitor)
+library(stringr) 
+library(lubridate)
+library(ggplot2)
+library(kableExtra)
+```
+
+
+### Step 1. Stage 
+
+Read (read_csv), ignore warnings - you'll see 4 parsing failures just ignore them. 
+
+1. create a new data frame called "yelp" using read_csv() to read in ratings_and_sentiments.csv data file 
+
+2. display the first 5 records
+
+```{r}
+yelp <-read_csv("data/ratings_and_sentiments.csv")
+head(yelp,5) %>%
+  kable() %>%
+  kable_styling(font=8)
+```
+
+
+### Step 2. Structure & Transform 
+
+Using the PIPE (%>%) and stringr functions  to create a "yelp_prep" dataset  by performing the following: 
+
+1.  Filter out any rows where coffee_shop_name is Null: filter(!is.na(coffee_shop_name))
+
+2.  Create a new date variable (review_date) based on the date contained the review_text field using mutate.
+
+- You'll note the review date is the first item in that field, so you'll need to parse it. 
+- if you've loaded stringr the "word()" function will grab the first "word" in a sentance 
+- or you can do the hard route  something like this ~  sub("\\s.*","", review_text)
+- To convert review_date to a Date data type you'll need to use another function 
+- lubridate has a function called mdy() for month day and year it will convert a string into a date, use that! 
+- make sure your new field is a DATE data type
+
+> Hint: mutate(review_date = mdy(word(review_text)))
+
+3. Create a flag variable "starbucks_flag", if the review mentions "starbucks", regardless of case, set the flag to "yes" else default it to "no" 
+
+> Hint: use mutate() to create starbucks_flag, use if_else(condition,1,0), there should be at least 320 mentions of starbucks 
+https://stringr.tidyverse.org/reference/index.html
+https://stringr.tidyverse.org/reference/str_detect.html
+
+> Hint: stringr and and str_detect() how do you deal with mixed cases hmm?
+https://stringr.tidyverse.org/reference/case.html
+
+
+4. Create a flag variable "good_flag" if the review mentions the word "good", regardless of case, set the flag to "yes" else default it to "no" , there should be around 3077 good references 
+
+5. Create a flag variable "great_flag" if the review mentions the word "great", regardless of case, set the flag to "yes" else default it to "no" , there should be around 2870 references to "great". 
+
+6. Convert coffee_sent to numeric using as.numeric(coffee_sent) 
+
+7. list the first 5 records to make sure your code works. 
+
+
+
+```{r}
+yelp_prep <- yelp %>%
+  #Q1
+  filter(!is.na(coffee_shop_name)) %>%
+  
+  #Q2
+  mutate(review_date = mdy(word(review_text))) %>%
+  
+  #Q3
+  mutate(starbucks_flag=if_else(str_detect(str_to_lower(review_text),"starbucks"),"yes","no")) %>%
+  
+  #Q4
+  mutate(good_flag=if_else(str_detect(str_to_lower(review_text),"good"),"yes","no")) %>%
+  
+  #Q5
+  mutate(great_flag=if_else(str_detect(str_to_lower(review_text),"great"),"yes","no")) %>%
+  
+  #Q6 (there is a #VALUE! data but not null in coffee_sent so I filter it out)
+  filter(coffee_sent %in%  c("-3","-2","-1","0","1","2","3","4")) %>%
+  mutate(coffee_sent=as.numeric(coffee_sent)) 
+  
+  #Q7
+head(yelp_prep,5)%>%
+  kable() %>%
+  kable_styling(font=8)
+```
+
+
+### Step 3. Frequency Analysis & Graphs 
+
+Create 5 bar charts, for the following variables, set the fill/color setting by indicated fields, use a facet wrap for the following. What if anything do the graphs tell you about sentiment and ratings? 
+
+if the fill/color variable is a numeric be sure to change it to a factor! 
+
+> here is a template to follow 
+
+yelp_prep %>%
+  ggplot(aes(x=numeric_variabale, fill=fill_variable)) +
+  geom_bar() + 
+  facet_wrap(~facet_variable) + 
+  labs(title = , x = , y = )
+
+
+Variable    Fill/Color  Facet Wrap      
+----------  ----------  --------------
+num_rating  great_flag  starbucks_flag
+
+
+```{r}
+yelp_prep %>%
+  ggplot(aes(x=num_rating, fill=great_flag)) +
+  geom_bar() + 
+  facet_wrap(~starbucks_flag) + 
+  labs(title = "Rating vs. 'STARBUCKS' Mentioned vs. 'GREAT' Mentioned",subtitle = "'STARBUCKS' Mentioned", x = "Rating Num", y = "Count of Ratings")
+```
+
+
+Variable      Fill/Color      facet wrap
+------------  --------------  ----------
+overall_sent  starbucks_flag  NA
+
+
+```{r}
+yelp_prep %>%
+  ggplot(aes(x=overall_sent, fill=starbucks_flag)) +
+  geom_bar() + 
+  labs(title = "Overall Sentiment vs. 'STARBUCKS' Mentioned", x = "Overall Sentiment", y ="Count of Overall Sentiment" )
+```
+
+
+Variable       Fill/Color   Facet Wrap      
+------------   ----------   --------------
+service_sent    great_flag  
+
+
+```{r}
+yelp_prep %>%
+  ggplot(aes(x=service_sent, fill=great_flag)) +
+  geom_bar() + 
+  labs(title = "Service Sentiment vs. 'GREAT' Mentioned", x = "Service Sentiment", y ="Count of Service Sentiment" )
+```
+
+Variable      Fill/Color  Facet Wrap      
+------------  ----------  --------------
+coffee_sent   N/A         Starbucks_flag
+
+
+
+```{r}
+yelp_prep %>%
+  ggplot(aes(x=coffee_sent)) +
+  geom_bar() + 
+  facet_wrap(~starbucks_flag) + 
+  labs(title = "Coffee Sentiment vs. 'STARBUCKS' Mentioned",  x = "Coffee Sentiment", y ="Count of Coffee Sentiment" )
+```
+
+
+Variable    Fill/Color  Facet Wrap      
+----------  ----------  --------------
+food_sent   good_flag   N/A
+
+
+```{r}
+yelp_prep %>%
+  filter(!is.na(food_sent)) %>%
+  #There is an NA data in food_sent so I filter it out.
+  ggplot(aes(x=food_sent, fill=good_flag)) +
+  geom_bar() + 
+  labs(title = "Food Sentiment vs. 'GOOD' Mentioned", x = "Food Sentiment", y ="Count of Food Sentiment" )
+```
+
+
+
+### Step 4. More interesting Analysis, Does day of Week Matter? 
+
+Create a new data set called sentiment_summary
+
+1. Create a new varaible day_of_week by applying wday to review_date, like this: wday(review_date, label = TRUE, abbr = FALSE)
+2. Group by day_of_week 
+3. Use summarize to create a count, mean of overall_sent, a mean of coffee_sent, rememver to remove NA values with na.rm = TRUE
+
+> also if you forgot to convert coffee_sent to numeric now is a good time to go back and do that : ) 
+
+
+```{r}
+yelp_final <- yelp_prep %>%
+  mutate(day_of_week=wday(review_date, label = TRUE, abbr = FALSE)) %>%
+  group_by(day_of_week) %>%
+  summarise(n=n(), mean_overall_sent=mean(overall_sent,na.rm=TRUE), mean_coffee_sent=mean(coffee_sent,na.rm=TRUE))
+yelp_final%>%
+  kable() %>%
+  kable_styling(font=10)
+```
+
+
+## Step 5. Create the Following Bar Charts using stat="identity"
+
+Create three Bar charts to answer the following questions 
+
+1. what is the most/least reviewed day of the week 
+Sunday has the most and Friday has the least reviews.
+
+2. what day are you most likely to get the highest/lowest mean overall sentiment 
+Wednesday the highst and Sunday the lowest.
+
+3. what day are you most likely to get the highest/lowest mean coffee sentiment 
+Monday the highest and Wednesday the lowest.
+  
+
+
+```{r}
+plot1 <-
+  ggplot(yelp_final) +
+  geom_bar(mapping=aes(x=day_of_week, y=n,fill=day_of_week), stat = "identity") + 
+  labs(title = "REVIEWS FOR DAYS OF WEEK", x = "DAY OF WEEK", y = "REVIEW NUM" )
+plot1
+
+plot2 <-
+  ggplot(yelp_final) +
+  geom_bar(aes(x=day_of_week, y=mean_overall_sent,fill=day_of_week), stat = "identity") + 
+  labs(title = "MEAN OF OVERALL SENTIMENT FOR DAYS OF WEEK", x = "DAY OF WEEK", y = "MEAN OF OVERALL SENTIMENT")
+plot2
+
+plot3 <-
+  ggplot(yelp_final) +
+  geom_bar(aes(x=day_of_week, y=mean_coffee_sent,fill=day_of_week), stat = "identity") + 
+  labs(title = "MEAN OF COFFEE SENTIMENT FOR DAYS OF WEEK", x = "DAY OF WEEK", y = "MEAN OF COFFEE SENTIMENT")
+plot3
+```
+
+
+## Finally
+
+Wrap this up in a R notebook and knit it to HTML, to exceed the bar - make sure things look good. 
+
