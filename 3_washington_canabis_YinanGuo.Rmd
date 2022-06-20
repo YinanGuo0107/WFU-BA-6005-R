@@ -1,0 +1,417 @@
+---
+title   : "Washington State Canabis Tax & Enforcement"
+author  : "Yinan Guo"
+date    : "2021-07-26" 
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: paper
+    highlight: tango
+---
+
+## About the data, 
+The great state of Washington started allowing retail sales of cannabis in July of 2014, and fortunately of us they publish some great data sets on licenses, sales, taxes, inspections and violations. Want to read more check out the following:
+
+https://lcb.wa.gov/
+
+
+https://data.lcb.wa.gov/
+
+## Task 0. Load libraries 
+
+We are going to use the standard tidyverse packages plus lubridate, RSocrata, and maybe one or two others. dump them here. 
+
+```{r}
+library(RSocrata)
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(skimr)
+```
+
+## Task 1. Stage 
+
+1a. load the following data sets:
+
+use the RSocrata package and read.socrata(url) to read these directly from data.lcb.wa.gov 
+
+- business:  https://data.lcb.wa.gov/resource/bhbp-x4eb.csv
+- sales :  https://data.lcb.wa.gov/resource/mnnb-ze8g.csv
+- inspections:  https://data.lcb.wa.gov/resource/w7wg-8m52.csv
+- violations:  https://data.lcb.wa.gov/resource/dgm4-3cm6.csv
+
+
+business <- read.socrata('https://data.lcb.wa.gov/resource/bhbp-x4eb.csv')
+sales <- read.socrata( 'https://data.lcb.wa.gov/resource/mnnb-ze8g.csv')
+inspections <- read.socrata( 'https://data.lcb.wa.gov/resource/w7wg-8m52.csv')
+violations <- read.socrata('https://data.lcb.wa.gov/resource/dgm4-3cm6.csv')
+
+the read.socrata also works with JSON data too. once read, double check the count the number of columns and records each dataset has.IF you   did this right you shouldnt have datasets with an even 1000 records in them, if you don't get close - it changes all the time -  to 1947 businesses, 31236 inspections, 79560 sales and 3158 violations you probably did something wrong... go back and review. 
+
+
+
+```{r}
+business <- read_csv("data/Licensed_Businesses.csv") %>%
+  clean_names()
+business
+
+sales <- read_csv("data/Sales_and_Tax_Report.csv")%>%
+  clean_names()
+sales
+
+inspections <- read_csv("data/Enforcement_Visits_Dataset.csv")%>%
+  clean_names()
+inspections
+
+violations <- read_csv("data/Violations_Dataset.csv")%>%
+  clean_names()
+violations
+```
+
+## Task 2. Structure & Cleanse
+
+### Clean up inspections dataset 
+
+create a new inspections_clean dataset by performing the following: 
+
+1. License_Number is a character format, you'll need to perform the following 
+2. filter out the "Unlicensed", Nulls NAs and the like (anything thats not an integer) 
+3. create a new column license_no that casts license_number to an integeger - this way it will join to the rest of the datasets. 
+4.  create the following based on date: 
+-- day_of_week (ex. Mon, Tue, Wed, Thur,etc.) hint use wday()
+-- month_and_year (ex. Jan 2018 )             hint use lubridate month and year functions and probably paste 
+-- year_no (ex. 2018)                         hint use lubridate year()
+
+```{r}
+inspections_clean <- inspections %>%
+  mutate(license_number = as.numeric(license_number)) %>%
+  filter(!is.na(license_number)) %>%
+  mutate(license_no = as.integer(license_number)) %>%
+  mutate(date = as.Date(date,format="%m/%d/%Y")) %>%
+  mutate(day_of_week = (wday(date,label=TRUE))) %>%
+  mutate(month_and_year = paste(month(date,label=TRUE),year(date),sep=' ')) %>%
+  mutate(year_no = year(date))
+inspections_clean
+```
+
+### Clean up business 
+
+create a new business_clean dataset by performing the following: 
+
+1. create date comes in as an integer convert it to a date using lubridate's ymd()
+2. zip is 9 digit we want to conver that to 5 digit so we can analyze zip codes 
+
+```{r}
+business_clean <- business %>%
+  mutate(date = ymd(create_date)) %>%
+  mutate(zip=substr(zip,1,5))
+business_clean
+```
+
+## Task 3. Analyze & Answer RES00
+
+1. How many businesses "organizations" are their by county? use n() to count, and n_distinct to get the distinct organization count
+2. make a bar chart by county. 
+  - can you re-order the chart by count distinct. 
+
+
+```{r}
+business_clean %>%
+  group_by(county) %>%
+  summarise(n=n(),distinct=n_distinct(organization)) %>%
+  ggplot(aes(x=reorder(county,distinct),y=distinct)) +
+  geom_bar(stat="identity") +
+  labs(title="County",
+        x ="County Names", 
+        y = "Distinct Numbers") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+
+### Sales Top 10 Retailers RES01
+Create a dataset RES01 of the top 10 MARIJUANA RETAILERs for 2017 to answer this you'll need to do the following: 
+
+1. inner join businesses_clean to sales_clean
+2. filter for fiscal_year == 2017
+3. group by organization
+4. sum total_sales
+5. use top_n to get the top 10 organizations by total sales. 
+> hint: use ungroup() 
+
+6. output RES01
+
+> print RES01
+> make a bar chart of organization and sales for 2017, make sure your bars are ordered!  
+
+
+```{r}
+sales_clean <- sales %>%
+  mutate(license_number = as.numeric(license_number)) %>%
+  filter(!is.na(license_number)) 
+
+RES01 <- business_clean %>%
+  inner_join(sales_clean,by=c("license"="license_number")) %>%
+  filter(fiscal_year == 2017) %>%
+  group_by(organization) %>%
+  summarise(totalsales = sum(total_sales)) %>%
+  ungroup() %>%
+  arrange(totalsales) %>%
+  top_n(10,totalsales)
+RES01
+
+RES01 %>%
+  ggplot(aes(reorder(x=organization,totalsales),y=totalsales)) +
+  geom_bar(stat="identity") +
+  labs(title="Organizations and Sales for 2017",
+        x ="Organizations", 
+        y = "Sales") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+### Sales Top Counties RES02 
+
+Create a dataset RES02 of the top 10 Counties for 2017 to answer this you'll need to do the following: 
+
+1. inner join businesses_clean to sales_clean
+2. filter for fiscal_year == 2017
+3. group by county
+4. sum total_sales
+5. use top_n to get the top 10 counties by total sales. 
+> hint: use ungroup() 
+
+6. output RES02
+
+> print RES02
+> make a bar chart of county and sales for 2017, make sure your bars are ordered!  
+
+
+
+```{r}
+RES02 <- business_clean %>%
+  inner_join(sales_clean,by=c("license"="license_number")) %>%
+  filter(fiscal_year == 2017) %>%
+  group_by(county) %>%
+  summarise(totalsales = sum(total_sales)) %>%
+  ungroup() %>%
+  arrange(totalsales) %>%
+  top_n(10,totalsales)
+RES02
+
+RES02 %>%
+  ggplot(aes(reorder(x=county,totalsales),y=totalsales)) +
+  geom_bar(stat="identity") +
+  labs(title="Counties and Sales for 2017",
+        x ="Counties", 
+        y = "Sales") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+### Sales Top Cities 2016 vs 2017 RES03 
+
+Create a dataset RES03 of the top 10 Cities 2016 and 2017  answer this you'll need to do the following: 
+
+1. inner join businesses_clean to sales_clean
+2. filter for fiscal_year equal to 2016 and 2017
+3. group by City
+4. sum total_sales
+5. use top_n to get the top 10 cities by total sales. 
+> hint: don't use ungroup() 
+
+6. output RES03
+
+> print RES03
+> make a bar chart of city and sales facet wrap by fiscal_year. 
+
+```{r}
+RES03 <- business_clean %>%
+  inner_join(sales_clean,by=c("license"="license_number")) %>%
+  filter( fiscal_year == "2017" | fiscal_year == "2016") %>%
+  group_by(fiscal_year, city) %>%
+  summarise(totalsales = sum(total_sales)) %>%
+  arrange(totalsales) %>%
+  top_n(10,totalsales)
+RES03
+
+RES03 %>%
+  ggplot(aes(reorder(x=city,totalsales),y=totalsales)) +
+  geom_bar(stat="identity") +
+  facet_wrap(~fiscal_year)+
+  labs(title="Cities and Sales for 2016-2017",
+        x ="Cities", 
+        y = "Sales") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+
+
+### Inspections by business 2016 and 2017  RES04 
+
+what organizations had the inspections in 2016 and 2017? 
+1. inner join buisness to inspections 
+2. filter for inspection date equal to  2016 and 2017, 
+  > hint use year(date) %in% c(2017,2018)
+  
+3. filter for 'Marijuana Premises Check'
+4. count up the number of inspections
+5. use top_n to get the top 10 organizations 
+6. ggplot to create a bar chart comparing top 10 businesses w. inspections. 
+
+
+```{r}
+#both business_clean and inspections_clean have "date" column and when I filter(year(date)) it shows that "Problem with `filter()` input `..1`. ℹ Input `..1` is `year(date) %in% c(2016, 2017)`. x do not know how to convert 'x' to class “POSIXlt”" so I choose data.y to filter.
+RES04 <- business_clean %>%
+  inner_join(inspections_clean,by=c("license"="license_number")) %>%
+  filter(year(date.y) %in% c(2016,2017)) %>%
+  filter(activity == 'Marijuana Premises Check') %>%
+  group_by(organization) %>%
+  summarise(num = n() )%>%
+  ungroup() %>%
+  arrange(num) %>%
+  top_n(10,num)
+RES04
+
+RES04 %>%
+  ggplot(aes(reorder(x=organization,num),y=num)) +
+  geom_bar(stat="identity") +
+  labs(title="top 10 Businesses w. Inspections. ",
+        x ="Business", 
+        y = "Inspections") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+  
+```
+
+### Inspections by City 2016 and 2017  RES05 
+
+What city perfomed the inspections in 2016 and 2017? 
+1. inner join buisness to inspections 
+2. fitler for inspection date equal to  2016 and 2017
+3. filter for 'Marijuana Premises Check'
+4. count up the number of inspections by city 
+5. use top_n to get the top 10 cities 
+6. ggplot to create a bar chart comparing top 10 cities. 
+
+```{r}
+RES05 <- business_clean %>%
+  inner_join(inspections_clean,by=c("license"="license_number")) %>%
+  filter(year(date.y) %in% c(2016,2017)) %>%
+  filter(activity == 'Marijuana Premises Check') %>%
+  group_by(city) %>%
+  summarise(num = n() )%>%
+  ungroup() %>%
+  arrange(num) %>%
+  top_n(10,num)
+RES05
+
+RES05 %>%
+  ggplot(aes(reorder(x=city,num),y=num)) +
+  geom_bar( stat="identity") +
+  labs(title="top 10 Cities w. Inspections. ",
+        x ="City", 
+        y = "Inspections") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+
+### Violations by Business 2016 and 2017 RES06
+
+Who had the most Violoations  in 2016, 2017  ? 
+1. inner join buisness to violations  
+2. fitler for visit_date year equal to 2016 and 2017 
+> hint use year(visit_date)
+
+3. count up the number of violations
+4. use top_n to get the top 10 organizations  
+5. ggplot to create a bar chart comparing top 10 organizations
+
+```{r}
+violation_clean <- violations %>%
+  mutate(visit_date=as.Date(visit_date,format="%m/%d/%Y"))
+
+RES06 <-
+  business_clean %>%
+  inner_join(violation_clean, by=c("license"="license_number")) %>%
+  filter(year(visit_date) %in% c(2016,2017)) %>%
+  group_by(organization) %>%
+  summarise(num = n()) %>%
+  ungroup() %>%
+  arrange(num) %>%
+  top_n(10,num) 
+RES06
+
+RES06 %>%
+  ggplot(aes(reorder(x=organization,num),y=num)) +
+  geom_bar(stat="identity") +
+  labs(title="top 10 Organizations w. Violations. ",
+        x ="Organizations", 
+        y = "Violations") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+
+### What organizations were the top 10, Sales to minors violation from 2015 - 2020, RES07? 
+1. inner join business to violoations 
+2. mutate to create a new variable violation_year 
+3. filter for violation_type containing the word "service to minor", hint str_detect 
+4. group by organization and year
+5. count, summarise(n=n())
+6. ungroup()
+6. spread by year and n fill in NA's with 0  spread(year,n,fill=0)
+7. create a new column that sums the voiolations accross years `2015` + `2016` + `2017` + etc... 
+8. get the top 10 by total top_n(10, tot)
+
+Print out the table arrange desc total sales to minor you should have 10 or 11 rows, and BUD HUT should be your major offender w. 5 sales to minors 
+
+make a bar chart of organization and total sales to minors order the bars by tot. 
+
+```{r}
+RES07 <-
+  business_clean %>%
+  inner_join(violation_clean, by=c("license"="license_number")) %>%
+  mutate(violation_year = year(visit_date)) %>%
+  filter(str_detect(violation_type,"service to minor")) %>%
+  group_by(organization,violation_year) %>%
+  summarise(num = n()) %>%
+  ungroup() %>%
+  spread(violation_year,num,fill=0) %>%
+  mutate(tot = rowSums(across(`2015`:last_col()))) %>%
+  arrange(desc(tot)) %>%
+  top_n(10,tot) 
+RES07
+
+RES07 %>%
+  ggplot(aes(reorder(x=organization,tot),y=tot)) +
+  geom_bar(stat="identity") +
+  labs(title="top 10 Organizations w. Violations - service to minor ",
+        x ="Organization", 
+        y = "Total Violations after 2015") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+### Using RES07 What were the Sales for these Organizations in 2017, RES08 
+
+
+1. I want you to figure out how to filter by the organizations in RES07, on your own. to do this you'll have to join business_clean to sales then filter for RES07. you need to filter sales for fiscal_year 2017. 
+
+print out the sales for these organizations
+
+make a bar chart of sales for these organizations 
+```{r}
+RES08<-
+  business_clean%>%
+  inner_join(sales_clean,by=c("license"="license_number"))%>%
+  filter(organization %in% c(RES07$organization),fiscal_year==2017)%>%
+  group_by(organization)%>%
+  summarise(tot=sum(total_sales))%>%
+    ungroup()
+RES08
+
+RES08 %>%
+  ggplot(aes(reorder(x=organization,tot),y=tot)) +
+  geom_bar(stat="identity") +
+  labs(title="top 10 Organizations w. Violations - service to minor ",
+        x ="Organization", 
+        y = "Total Violations after 2015") + 
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
