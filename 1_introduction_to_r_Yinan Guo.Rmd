@@ -1,0 +1,212 @@
+---
+title   : "1 - Introduction to R"
+author  : "Yinan Guo"
+date    : "July 9th, 2021" 
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: paper
+    highlight: tango
+---
+
+## Instructions 
+
+Lets jump right into R coding this week! In this assignment, we'll be creating a "Cheat Sheet" that you can refer back to over the course of this section and we'll jump into some basic analysis with ggplot2. To complete this assignment, follow these steps:
+
+1. Download the `introduction_to_R_yournamehere.Rmd` file from the course website.
+
+2. Open `introduction_to_R_yournamehere.Rmd` in RStudio.
+
+3. Replace the "Your Name Here" text in the `author:` field with your own name.
+
+4. Supply your solutions to the project by editing `introduction_to_R_yournamehere.Rmd`.
+
+5. When you have completed the homework and have **checked** that your code both runs in the Console and **knit** correctly when you click `Knit HTML`, save the Knitted HTML file as `introduction_to_R_yournamehere.html`, and submit the HTML file!!  
+
+> Tip:  Note that each of the code blocks in this Problem contain the expression `eval = FALSE`.  This tells R Markdown to display the code contained in the block, but not to evaluate it.  you'll need to change this to `eval = TRUE` before you
+
+**knit**
+
+### Problem 0. Load Libraries 
+> load the following libraries 
+- tidyverse
+- skimr
+- janitor 
+
+don't forget to change `eval=FASE` to `eval=TRUE`
+
+```{r}
+library(tidyverse)
+library(skimr)
+library(janitor)
+```
+
+
+### Problem 1: Data Types 
+
+> In this section we'll work with R's two base data types Numeric & Character as well Integer, Logial and Dates to do this answer the following questoins 
+
+
+##### (a) Numeric Data using R as a Calculator 
+
+In its most basic form, R can be used as a simple calculator using basic arithmetic operators:
+
+- Addition: +
+- Subtraction: -
+- Multiplication: *
+- Division: /
+- Exponentiation: ^
+- Modulo: %%
+
+> question 1. write an expression that evaluates to TRUE if x == y ^ z where you assign x to 128 and assign y to 2 what does z need to be? 
+
+don't forget to change `eval=FASE` 
+
+```{r}
+  # Insert your Assignment logic here
+x <- 128
+y <- 2
+z <- log(x,y)
+
+  # Insert your Boolean Expression here 
+x == y^z
+
+```
+
+
+##### (b) Checking inequality.
+
+> question 2. write an equation that evaluates to TRUE if x / y is greater than 1/x times y.
+
+```{r}
+x <- 5
+y <- 4
+
+# Insert your Boolean expression here
+x / y >= 1/x * y 
+```
+
+##### (c) A formula. 
+
+> question 3. given the equation IBU = -32.9 + 1156 * abv + 25.27 * ipa + 2.79 * ale 
+
+If you replace abv with 0.062, ipa with 0 and ale with a 1 what does ibu sum up to? 
+
+Is ibuthan 50 or less than 50?  
+
+hint: there may be a if/else gotcha down below... 
+
+
+```{r}
+abv <- 0.062
+ipa <- 0
+ale <- 1
+ibu = -32.9 + 1156 * abv + 25.27 * ipa + 2.79 * ale
+
+L <- ibu > 50
+
+# Insert your Boolean expression here
+if (L ){
+  print("Greater than 50  ")
+} else {
+  print("Less than 50  ")
+}
+```
+
+
+##### (d) playing with character data.
+
+> question 4. write an expression using sprintf to print out "George Washington Hayduke has $250.01" given the following 
+
+```{r}
+x <- "Seldom Seen Smith"
+
+fname <- "George"
+mname <- "Washington"
+lname <- "Hayduke"
+money <- 250.01 
+
+full_name <- paste(fname, mname, lname, sep=" " )
+
+sprintf("%s %s%.2f",full_name, "has $", money)
+```
+
+
+### Problem 2: Vectors 
+
+#### (a) create a numeric vector 
+
+> question 1. craete a vector containing of 20 random numbers from 0 to 100 and peform the following operations on it
+
+- use runif to create your vector ranif(20, min=0, max=100)
+- use vector arithmetic so that the vector sums to 1  
+
+```{r, eval = TRUE}
+v1 <- runif(20, min=0, max=100)
+
+# use vector arithmetic so that the v2 sums to 1, simply v1/sum(v1)
+v2 <- v1 / sum(v1)
+sum(v2)
+```
+
+
+
+##### (b) Comparing  Character Vectors 
+
+> Given two users's preferences between two options: [Facebook, Instagram], [Firefox, Chrome], [Mac, PC], [Summer, Winter].  
+- how many things do they aggree on and how many do they not? 
+
+
+```{r, eval = TRUE}
+mike  <- c("Instagram", "Chrome", "Mac", "Summer")
+cole  <- c("Facebook", "Chrome", "PC", "Winter")
+
+same_n <- length(intersect(mike,cole))
+same_n
+
+diff_n <- length(setdiff(mike,cole))
+diff_n
+```
+
+##### (c) Looping through a vector  
+
+> use a for loop to itterate through a list of numbers  
+
+for (num in list_o_numbers){
+  print(num)
+}
+
+```{r, eval = TRUE}
+list_o_numbers <- runif(20, min=0, max=100)
+
+for (num in list_o_numbers){
+  print(num)
+}
+```
+
+### Problem 3: Data frame basics
+> grab the AUTO_MPG.csv from the course website 
+
+##### (a) Importing data.
+
+> I prefer to use the `readr` libary for reading CSV files into R as apposed to the base `read.csv()` function to import data. use both readr's `read_csv` and `read.csv()` 
+- use head to disply the first 5 records of each. 
+- do you notice anything different? 
+
+**Tip**: if the data is located at a URL you can import it simply by referencing the URL you don't need to always download the data first,  instead you can import it  data directly using the URL.
+
+```{r, eval=TRUE}
+library(readr)
+mpg_1 <- read_csv('AUTO_MPG.csv')
+
+mpg_2 <- read.csv('AUTO_MPG.csv')
+
+# display the top 5 records of both using head(mpg_1) and head(mpg_2)... what do you notice different? 
+head(mpg_1)
+
+head(mpg_2)
+
+```
+read_csv will generate data into tbl_df.
+read.csv will show the number of row.
